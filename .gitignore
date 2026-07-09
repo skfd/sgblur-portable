@@ -4,3 +4,7 @@ datasets
 .venv
 .vscode
 __pycache__
+
+# Port artifacts (generated)
+models/*.onnx
+port/detect_test_out.jpg

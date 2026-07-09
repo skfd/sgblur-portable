@@ -1,0 +1,7 @@
+# Phase 1 detection port — AMD Radeon 890M via ONNX Runtime + DirectML.
+# Install into a Python 3.12 venv (3.14 has no torch/onnxruntime-directml wheels yet):
+#   py -3.12 -m venv .venv
+#   .venv/Scripts/python.exe -m pip install -r port/requirements.txt
+ultralytics==8.4.91          # model loading + ONNX export (pulls torch CPU)
+onnx==1.22.0                 # export target
+onnxruntime-directml==1.24.4 # DmlExecutionProvider -> runs on the iGPU
