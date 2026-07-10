@@ -55,7 +55,7 @@ def preprocess(bgr):
     return np.ascontiguousarray(x), r, left, top
 
 
-def postprocess(out, r, left, top, orig_shape):
+def postprocess(out, r, left, top, orig_shape, conf_thr=MIN_CONF):
     """out: (1, 4+nc, N) YOLO11 head. Returns list of (cls_name, conf, x1,y1,x2,y2)."""
     preds = out[0].transpose(1, 0)  # (N, 4+nc)
     boxes_xywh = preds[:, :4]
@@ -63,7 +63,7 @@ def postprocess(out, r, left, top, orig_shape):
     cls = scores_all.argmax(1)
     conf = scores_all.max(1)
 
-    keep = conf >= MIN_CONF
+    keep = conf >= conf_thr
     boxes_xywh, conf, cls = boxes_xywh[keep], conf[keep], cls[keep]
     if len(boxes_xywh) == 0:
         return []

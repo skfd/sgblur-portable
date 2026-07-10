@@ -26,7 +26,7 @@ import cv2
 import numpy as np
 import onnxruntime as ort
 
-from detect_test import letterbox, postprocess, NAMES, COLORS, MODEL, DEFAULT_IMG
+from detect_test import letterbox, postprocess, NAMES, COLORS, MODEL, DEFAULT_IMG, MIN_CONF
 
 
 def iou(a, b):
@@ -47,7 +47,7 @@ def make_session(model_path):
     )
 
 
-def infer(session, bgr_crop, imgsz, offset):
+def infer(session, bgr_crop, imgsz, offset, conf_thr=MIN_CONF):
     """Run one pass on a (crop of an) image at a given square size. Returns
     detections as (name, conf, x1, y1, x2, y2) in FULL-image coords via offset."""
     padded, r, left, top = letterbox(bgr_crop, new_shape=imgsz)
@@ -55,23 +55,24 @@ def infer(session, bgr_crop, imgsz, offset):
     x = np.ascontiguousarray((rgb.astype(np.float32) / 255.0).transpose(2, 0, 1)[None])
     name = session.get_inputs()[0].name
     out = session.run(None, {name: x})[0]
-    dets = postprocess(out, r, left, top, bgr_crop.shape)
+    dets = postprocess(out, r, left, top, bgr_crop.shape, conf_thr)
     ox, oy = offset
     return [(n, c, x1 + ox, y1 + oy, x2 + ox, y2 + oy) for (n, c, x1, y1, x2, y2) in dets]
 
 
-def detect(session, bgr):
-    """Multi-scale detection. Returns list of (label, dt_ms, detections) per pass."""
+def detect(session, bgr, conf_thr=MIN_CONF, do_xl=True):
+    """Multi-scale detection. Returns list of (label, dt_ms, detections) per pass.
+    do_xl toggles the expensive 4096 split-half passes (throughput lever)."""
     h, w = bgr.shape[:2]
     passes = []
 
     for label, sz in (("S 1024", 1024), ("L 2048", 2048)):
         t0 = time.perf_counter()
-        dets = infer(session, bgr, sz, (0, 0))
+        dets = infer(session, bgr, sz, (0, 0), conf_thr)
         passes.append((label, (time.perf_counter() - t0) * 1000, dets))
 
     # 360 panoramic: extra high-res pass on middle band of each half
-    if w >= 5760 and w >= h * 2:
+    if do_xl and w >= 5760 and w >= h * 2:
         split = w // 2
         ho = h // 4
         xl = min((w >> 5) << 5, 4096)
@@ -79,7 +80,7 @@ def detect(session, bgr):
                  ("XL-R", bgr[ho:h * 3 // 4, split:w], (split, ho))]
         for name, crop, off in crops:
             t0 = time.perf_counter()
-            dets = infer(session, crop, xl, off)
+            dets = infer(session, crop, xl, off, conf_thr)
             passes.append((f"{name} {xl}", (time.perf_counter() - t0) * 1000, dets))
 
     return passes

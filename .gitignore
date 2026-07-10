@@ -8,3 +8,8 @@ __pycache__
 # Port artifacts (generated)
 models/*.onnx
 port/detect_test_out.jpg
+port/detect_dml_out.jpg
+port/eval/annotated/
+port/eval/*.json
+port/eval/sample.txt
+port/eval/score_out.txt
