@@ -9,6 +9,7 @@ __pycache__
 models/*.onnx
 port/detect_test_out.jpg
 port/detect_dml_out.jpg
+port/blur_test_out.jpg
 port/eval/annotated/
 port/eval/*.json
 port/eval/sample.txt
