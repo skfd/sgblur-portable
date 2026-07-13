@@ -5,3 +5,16 @@
 ultralytics==8.4.91          # model loading + ONNX export (pulls torch CPU)
 onnx==1.22.0                 # export target
 onnxruntime-directml==1.24.4 # DmlExecutionProvider -> runs on the iGPU
+
+# GOTCHA: never let vanilla `onnxruntime` get installed alongside
+# onnxruntime-directml -- they share the `onnxruntime` namespace and vanilla
+# shadows DirectML (providers drop to CPU/Azure only). Two things install it:
+#   1. onnxconverter-common depends on it (don't use it; export fp16 via
+#      Ultralytics `half=True` instead).
+#   2. Ultralytics `.export(format='onnx')` auto-installs it during the
+#      requirements check.
+# So do model EXPORTS in a throwaway step, then restore DirectML with:
+#   pip uninstall -y onnxruntime onnxruntime-directml
+#   pip install --force-reinstall --no-deps onnxruntime-directml==1.24.4
+# Verify: python -c "import onnxruntime as o; print(o.get_available_providers())"
+# must list 'DmlExecutionProvider'.

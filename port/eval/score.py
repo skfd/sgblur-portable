@@ -25,14 +25,17 @@ CANDIDATES = Path("port/eval/candidates.json")
 CLASSES = ("face", "plate", "sign")
 MATCH_IOU = 0.5
 
-# (label, model_onnx, conf, do_xl)
+# (label, model_onnx, conf, do_xl, xl_size). Edit per experiment.
+# Frontier snapshot (14 frames): no free lunch -- every ~2x speedup costs real
+# face/plate recall. Best recall = l all 0.15 fp32 (~11.9s/img, ~9.6d for 70k).
+# fp16 is ~2.4x faster but drops face 1.00->0.67, plate 1.00->0.57 AND is flaky
+# on this DirectML runtime, so it is not recommended.
 CONFIGS = [
-    ("l all 0.15 (ref)", "models/yolo11l_panoramax.onnx", 0.15, True),
-    ("l all 0.30",       "models/yolo11l_panoramax.onnx", 0.30, True),
-    ("l S+L 0.15",       "models/yolo11l_panoramax.onnx", 0.15, False),
-    ("s all 0.15",       "models/yolo11s_panoramax.onnx", 0.15, True),
-    ("s all 0.30",       "models/yolo11s_panoramax.onnx", 0.30, True),
-    ("s S+L 0.15",       "models/yolo11s_panoramax.onnx", 0.15, False),
+    ("l all 0.15 fp32 ref", "models/yolo11l_panoramax.onnx", 0.15, True,  4096),
+    ("l all 0.30 fp32",     "models/yolo11l_panoramax.onnx", 0.30, True,  4096),
+    ("l S+L 0.15 fp32",     "models/yolo11l_panoramax.onnx", 0.15, False, 4096),
+    ("s all 0.15 fp32",     "models/yolo11s_panoramax.onnx", 0.15, True,  4096),
+    ("l all 0.15 fp16",     "models/yolo11l_panoramax_fp16.onnx", 0.15, True, 4096),
 ]
 
 
@@ -78,7 +81,7 @@ def main():
 
     sessions = {}
     rows = []
-    for label, model, conf, do_xl in CONFIGS:
+    for label, model, conf, do_xl, xl_size in CONFIGS:
         if model not in sessions:
             sessions[model] = make_session(model)
         sess = sessions[model]
@@ -88,7 +91,11 @@ def main():
         t0 = time.perf_counter()
         for name, r in ref.items():
             bgr = cv2.imread(r["path"])
-            dets = merge(detect(sess, bgr, conf_thr=conf, do_xl=do_xl))
+            try:
+                dets = merge(detect(sess, bgr, conf_thr=conf, do_xl=do_xl, xl_size=xl_size))
+            except Exception as e:
+                print(f"    ! {label} failed on {name}: {repr(e)[:120]}")
+                continue
             got = {c: [(d[2], d[3], d[4], d[5]) for d in dets if d[0] == c] for c in CLASSES}
             m = recall_vs_ref(r["boxes"], got)
             for c in CLASSES:

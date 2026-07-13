@@ -60,9 +60,10 @@ def infer(session, bgr_crop, imgsz, offset, conf_thr=MIN_CONF):
     return [(n, c, x1 + ox, y1 + oy, x2 + ox, y2 + oy) for (n, c, x1, y1, x2, y2) in dets]
 
 
-def detect(session, bgr, conf_thr=MIN_CONF, do_xl=True):
+def detect(session, bgr, conf_thr=MIN_CONF, do_xl=True, xl_size=4096):
     """Multi-scale detection. Returns list of (label, dt_ms, detections) per pass.
-    do_xl toggles the expensive 4096 split-half passes (throughput lever)."""
+    do_xl toggles the expensive split-half passes; xl_size caps their resolution
+    (both are throughput levers)."""
     h, w = bgr.shape[:2]
     passes = []
 
@@ -75,7 +76,7 @@ def detect(session, bgr, conf_thr=MIN_CONF, do_xl=True):
     if do_xl and w >= 5760 and w >= h * 2:
         split = w // 2
         ho = h // 4
-        xl = min((w >> 5) << 5, 4096)
+        xl = min((w >> 5) << 5, xl_size)
         crops = [("XL-L", bgr[ho:h * 3 // 4, 0:split], (0, ho)),
                  ("XL-R", bgr[ho:h * 3 // 4, split:w], (split, ho))]
         for name, crop, off in crops:
