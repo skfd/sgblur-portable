@@ -54,6 +54,36 @@ def blur_box_dct(components, y_shape, box):
         zero_ac(comp, r0, r1, c0, c1)
 
 
+def blur_image(session, img_path, out_path, conf=CONF, verbose=False):
+    """Detect + DCT-blur one image, write to out_path (EXIF preserved by jpeglib).
+    Returns (n_detections, n_blurred). Raises ValueError on unreadable/mismatched."""
+    bgr = cv2.imread(str(img_path))
+    if bgr is None:
+        raise ValueError(f"unreadable image: {img_path}")
+
+    dets = merge(detect(session, bgr, conf_thr=conf, do_xl=True))
+    to_blur = [d for d in dets if d[0] in BLUR_CLASSES]
+
+    d = jpeglib.read_dct(str(img_path))
+    if not (d.Y.shape[1] * 8 == bgr.shape[1] and d.Y.shape[0] * 8 == bgr.shape[0]):
+        raise ValueError(f"DCT grid {d.Y.shape[:2]} does not match image {bgr.shape[:2]}")
+    components = [d.Y] + ([d.Cb, d.Cr] if d.has_chrominance else [])
+
+    blurred = 0
+    for name, cf, x1, y1, x2, y2 in to_blur:
+        if x2 - x1 < 12 or y2 - y1 < 12:
+            if verbose:
+                print(f"  skip {name} (too small: {x2 - x1}x{y2 - y1})")
+            continue
+        blur_box_dct(components, d.Y.shape, (x1, y1, x2, y2))
+        blurred += 1
+        if verbose:
+            print(f"  blurred {name} {cf:.2f} at ({x1},{y1},{x2},{y2})")
+
+    d.write_dct(str(out_path))
+    return len(dets), blurred
+
+
 def main():
     if len(sys.argv) < 2:
         sys.exit("usage: blur_dct.py <image.jpg> [out.jpg] [model.onnx]")
@@ -61,33 +91,9 @@ def main():
     out_path = sys.argv[2] if len(sys.argv) > 2 else "port/blur_dct_out.jpg"
     model_path = Path(sys.argv[3]) if len(sys.argv) > 3 else MODEL
 
-    bgr = cv2.imread(img_path)
-    if bgr is None:
-        sys.exit(f"Could not read image: {img_path}")
-
     session = make_session(model_path)
-    dets = merge(detect(session, bgr, conf_thr=CONF, do_xl=True))
-    to_blur = [d for d in dets if d[0] in BLUR_CLASSES]
-    print(f"image: {img_path}  {bgr.shape[1]}x{bgr.shape[0]}")
-    print(f"detections: {len(dets)}  to blur (face/plate): {len(to_blur)}")
-
-    d = jpeglib.read_dct(img_path)
-    # sanity: DCT grid must match the pixels detection ran on
-    assert d.Y.shape[1] * 8 == bgr.shape[1] and d.Y.shape[0] * 8 == bgr.shape[0], \
-        f"DCT grid {d.Y.shape[:2]} does not match image {bgr.shape[:2]}"
-    components = [d.Y] + ([d.Cb, d.Cr] if d.has_chrominance else [])
-
-    blurred = 0
-    for name, conf, x1, y1, x2, y2 in to_blur:
-        if x2 - x1 < 12 or y2 - y1 < 12:
-            print(f"  skip {name} (too small: {x2 - x1}x{y2 - y1})")
-            continue
-        blur_box_dct(components, d.Y.shape, (x1, y1, x2, y2))
-        blurred += 1
-        print(f"  blurred {name} {conf:.2f} at ({x1},{y1},{x2},{y2})")
-
-    d.write_dct(out_path)
-    print(f"\n{blurred} regions blurred -> {out_path}")
+    n_det, n_blur = blur_image(session, img_path, out_path, verbose=True)
+    print(f"\ndetections: {n_det}  blurred (face/plate): {n_blur} -> {out_path}")
 
 
 if __name__ == "__main__":
