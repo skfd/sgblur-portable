@@ -1,6 +1,14 @@
-# Porting plan (draft)
+# Porting plan
 
-No code yet. Ordered so the make-or-break question is answered first.
+**All phases complete** (see `PORT-README.md` for the working pipeline). History
+below; ordered so the make-or-break question was answered first.
+
+- Phase 0 — Feasibility gate — **PASSED**
+- Phase 1 — Detection off-CUDA (DirectML) — **DONE** (`port/detect_dml.py`)
+- Phase 2 — Blur + measure — **DONE** (`port/blur_dct.py`, pure-Python lossless DCT)
+- Phase 3 — Batch mode — **DONE** (`port/blur_batch.py`, resumable)
+
+Open: the rent-vs-run decision for the actual 70k batch.
 
 ## Phase 0 — Feasibility gate — PASSED (2026-07-01)
 

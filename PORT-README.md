@@ -1,56 +1,87 @@
 # sgblur-portable
 
-Port Panoramax's **SGBlur** face/plate blurring off its Nvidia-CUDA-only default so
-it runs on **AMD** (Radeon 890M iGPU, via DirectML/ONNX) and/or **Apple Metal**
-(Mac Mini, via PyTorch MPS). Goal: **private, local blurring** of a fixed archive
-before upload, using hardware already owned — no GPU rental, no shared cloud endpoint.
+Port of Panoramax's **SGBlur** face/plate blurring off its Nvidia-CUDA-only
+default so it runs on **AMD** (Radeon 890M iGPU, via ONNX Runtime + **DirectML**).
+Goal: **private, local blurring** of a fixed archive before upload, on hardware
+already owned — no GPU rental, no shared cloud endpoint, **no native binaries**.
 
-Status: **planning only (text stubs, no code yet).**
+Status: **working end-to-end.** Detection → lossless blur → resumable batch, all
+on the iGPU, no CUDA. See `PORTING-PLAN.md` for phase history.
 
 ## Why this exists
 
-Sibling project to `mapillary-export` (../mapillary-export). That project republishes
-~70k equirectangular 360 photos (5760x2880, ~16 MP each) to a self-hosted, public,
-federated Panoramax instance + KartaView. Panoramax expects faces/plates blurred.
-SGBlur is the tool, but it GPU-accelerates only on Nvidia CUDA. This repo explores
-making it run on non-Nvidia hardware we already have.
+Sibling to `mapillary-export` (../mapillary-export), which republishes ~70k
+equirectangular 360 photos (5760×2880, ~16 MP) to a self-hosted Panoramax
+instance + KartaView. Panoramax expects faces/plates blurred. Upstream SGBlur
+GPU-accelerates only on Nvidia CUDA; this repo makes it run on non-Nvidia
+hardware we own.
 
-## Upstream facts (verified 2026-07-01)
+## What's here (`port/`)
 
-- Source: `gitlab.com/panoramax/server/sgblur` and mirror `github.com/cquest/sgblur`.
-- **License: MIT** — free to fork, modify, redistribute.
-- Two independent parts:
-  1. **Detection** = Ultralytics **YOLOv11** (PyTorch), *custom-trained* model for
-     faces + plates. This is the ONLY GPU-accelerated step.
-  2. **Blur** = low-level **JPEG MCU manipulation** (no decompress/recompress). Pure
-     CPU, already portable, nothing to change.
-- So "porting" = getting the YOLOv11 detection onto a non-CUDA backend. The blur
-  step runs anywhere as-is.
+| File | Role |
+|---|---|
+| `detect_dml.py` | Multi-scale (S 1024, L 2048, XL split-halves @4096 for 360s) YOLOv11 detection on DirectML |
+| `blur_dct.py` | Pure-Python **lossless** face/plate blur via JPEG DCT-coefficient editing (`jpeglib`) |
+| `blur_batch.py` | Resumable folder-in → folder-out batch runner |
+| `eval/` | Recall-vs-speed tuning harness (see `eval/README.md`) |
+| `detect_test.py`, `blur_test.py` | Early probes / validation (superseded by the above) |
+| `requirements.txt` | Deps + the DirectML install gotchas |
 
-## Port targets
+## Usage
 
-| Target | Backend | Notes |
-|---|---|---|
-| AMD Radeon 890M (Windows) | ONNX Runtime + **DirectML**, or `torch-directml` | Uses hardware we own. iGPU ~5-15x slower than desktop Nvidia (estimate), still >> CPU-only. Preferred path. |
-| Apple Metal (Mac Mini) | PyTorch **MPS** (`device='mps'`) | ~one-line change, but requires buying a Mac; its GPU still trails a cheap Nvidia card. Not recommended as a purchase. |
-| Universal | Export `.pt` -> **ONNX**, run via ONNX Runtime | Cleanest; provider picks CUDA/DirectML/CoreML/CPU. |
+```sh
+py -3.12 -m venv .venv                                      # 3.14 has no torch/ort-dml wheels
+.venv/Scripts/python.exe -m pip install -r port/requirements.txt
+# one-time: export weights to ONNX (see requirements.txt gotcha -- export re-installs
+# vanilla onnxruntime and shadows DirectML; reinstall onnxruntime-directml after)
+.venv/Scripts/python.exe -c "from ultralytics import YOLO; YOLO('models/yolo11l_panoramax.pt').export(format='onnx', dynamic=True, opset=17)"
 
-## GATING QUESTION: RESOLVED — port is FEASIBLE (2026-07-01)
+.venv/Scripts/python.exe port/blur_batch.py <input_dir> <output_dir>
+```
 
-Weights are **public and permissively licensed**. On Hugging Face,
-`Panoramax/detect_face_plate_sign`:
-- `yolo11l_panoramax.pt` (51.6 MB) — YOLOv11-large, trained at **imgsz 2048**, 300 epochs.
-- `yolov8s_panoramax.pt` (23 MB) — lighter/faster fallback.
-- License **etalab-2.0** (permissive open, reuse incl. commercial w/ attribution).
-- Standard Ultralytics `.pt` -> exports to ONNX via `yolo export format=onnx`.
+Output mirrors the input tree, preserves EXIF/GPS, and **skips already-blurred
+files** so a multi-day run is stop/restart-safe.
 
-QA flags: faces mAP50 only **0.657** (plates/signs higher) -> some faces missed;
-spot-check a blurred series before trusting it. Inference at **2048px** is heavy;
-`yolov8s` is the speed lever on the 890M.
+## How it works — and two things that surprised us
+
+1. **Ultralytics' ONNX loader never selects DirectML** (only CUDA/CoreML/CPU), so
+   loading a `.onnx` through `YOLO()` silently runs on CPU. We drive
+   `onnxruntime.InferenceSession(..., providers=['DmlExecutionProvider', ...])`
+   directly and do letterbox + NMS ourselves.
+2. **The blur step was *not* "already portable."** Upstream's MCU-lossless blur
+   shells out to native `jpegtran`/`djpeg`/`cjpeg` + a turbojpeg DLL. Rather than
+   vendor those on Windows, we reimplemented the blur **in the DCT domain in pure
+   Python**: zero the AC coefficients of each 8×8 block a face/plate box touches
+   (keep DC = block-average pixelation), leaving every other block bit-exact. No
+   subprocess, no native deps. Verified: 0 pixels change outside the boxes; output
+   is not bloated; EXIF/GPS preserved.
+
+## Recall vs speed (14-frame eval, iGPU)
+
+Best recall is the full config; every speedup costs real faces/plates — **no free
+lunch** (fp16, smaller model, and dropping the 4096 passes were all tested).
+
+| Config | face recall | plate recall | speed | 70k est. |
+|---|---|---|---|---|
+| **yolo11l, all scales, conf 0.15** | 1.00 (ref) | 1.00 (ref) | ~12–14 s | **~11 days** |
+| yolo11l, all scales, conf 0.30 | 0.78 | 0.86 | ~12 s | ~10 days |
+| yolo11s, all scales, conf 0.15 | 0.56 | 0.71 | ~6 s | ~5 days |
+| yolo11l, no XL passes | 0.67 | 0.43 | ~1 s | ~21 h |
+
+(Recall is relative to the generous reference; QA note: faces mAP50 is only ~0.657
+upstream, so spot-check output before trusting a full run.)
 
 ## Reality check
 
-For a one-time 70k batch, the free OSM-FR blur endpoint (zero hardware) or a rented
-Nvidia spot box (~$5, done in hours) both beat spending time on this port. This port
-is only worth it if we want **permanent, private, $0-hardware** blurring we control.
-See PORTING-PLAN.md.
+For a **one-time** 70k batch, a rented Nvidia spot box (~$5, hours) or the free
+OSM-FR endpoint beat ~11 days of iGPU grinding. This port earns its keep only if
+you want **permanent, private, $0-marginal, repeatable** blurring you control —
+which now exists and works.
+
+## Upstream facts
+
+- Source: `gitlab.com/panoramax/server/sgblur`, mirror `github.com/cquest/sgblur`. **MIT.**
+- Weights: HF `Panoramax/detect_face_plate_sign` (`yolo11{n,s,m,l}_panoramax.pt`),
+  license **etalab-2.0**. Standard Ultralytics `.pt` → ONNX.
+- Two independent parts: **detection** (YOLOv11, the only GPU step) and **blur**
+  (JPEG block manipulation, CPU).
