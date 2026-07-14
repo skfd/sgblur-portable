@@ -5,6 +5,7 @@
 ultralytics==8.4.91          # model loading + ONNX export (pulls torch CPU)
 onnx==1.22.0                 # export target
 onnxruntime-directml==1.24.4 # DmlExecutionProvider -> runs on the iGPU
+jpeglib==1.0.2               # read/write JPEG DCT coefficients for lossless blur
 
 # GOTCHA: never let vanilla `onnxruntime` get installed alongside
 # onnxruntime-directml -- they share the `onnxruntime` namespace and vanilla
