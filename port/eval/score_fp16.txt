@@ -1,0 +1,27 @@
+reference objects: face=9  plate=7  sign=8
+frames: 14
+
+  l all 0.15 fp32 ref face 1.00  plate 1.00  sign 1.00   +extra f/p/s 0/0/0    11.4 s/img
+    ! l all 0.15 fp16 failed on GSAR9130.JPG: Fail('[ONNXRuntimeError] : 1 : FAIL : E:\\_work\\1\\s\\onnxruntime\\core\\providers\\dml\\DmlExecutionProvider\\src\\Dml
+    ! l all 0.15 fp16 failed on GSAR9156.JPG: Fail('[ONNXRuntimeError] : 1 : FAIL : E:\\_work\\1\\s\\onnxruntime\\core\\providers\\dml\\DmlExecutionProvider\\src\\Exe
+    ! l all 0.15 fp16 failed on GSAR9182.JPG: Fail('[ONNXRuntimeError] : 1 : FAIL : E:\\_work\\1\\s\\onnxruntime\\core\\providers\\dml\\DmlExecutionProvider\\src\\Exe
+    ! l all 0.15 fp16 failed on GSAR9210.JPG: Fail('[ONNXRuntimeError] : 1 : FAIL : E:\\_work\\1\\s\\onnxruntime\\core\\providers\\dml\\DmlExecutionProvider\\src\\Exe
+  l all 0.15 fp16    face 0.67  plate 0.57  sign 0.75   +extra f/p/s 0/0/0     4.8 s/img
+    ! l all 0.15 fp16 xl3072 failed on GSAK3613.JPG: Fail('[ONNXRuntimeError] : 1 : FAIL : E:\\_work\\1\\s\\onnxruntime\\core\\providers\\dml\\DmlExecutionProvider\\src\\Exe
+    ! l all 0.15 fp16 xl3072 failed on GSAK3628.JPG: Fail('[ONNXRuntimeError] : 1 : FAIL : E:\\_work\\1\\s\\onnxruntime\\core\\providers\\dml\\DmlExecutionProvider\\src\\Exe
+    ! l all 0.15 fp16 xl3072 failed on GSAK3642.JPG: Fail('[ONNXRuntimeError] : 1 : FAIL : E:\\_work\\1\\s\\onnxruntime\\core\\providers\\dml\\DmlExecutionProvider\\src\\Exe
+    ! l all 0.15 fp16 xl3072 failed on GSAK3657.JPG: Fail('[ONNXRuntimeError] : 1 : FAIL : E:\\_work\\1\\s\\onnxruntime\\core\\providers\\dml\\DmlExecutionProvider\\src\\Exe
+    ! l all 0.15 fp16 xl3072 failed on GSAK3700.JPG: Fail('[ONNXRuntimeError] : 1 : FAIL : E:\\_work\\1\\s\\onnxruntime\\core\\providers\\dml\\DmlExecutionProvider\\src\\Exe
+    ! l all 0.15 fp16 xl3072 failed on GSAK3717.JPG: Fail('[ONNXRuntimeError] : 1 : FAIL : E:\\_work\\1\\s\\onnxruntime\\core\\providers\\dml\\DmlExecutionProvider\\src\\Exe
+    ! l all 0.15 fp16 xl3072 failed on GSAK3732.JPG: Fail('[ONNXRuntimeError] : 1 : FAIL : E:\\_work\\1\\s\\onnxruntime\\core\\providers\\dml\\DmlExecutionProvider\\src\\Exe
+    ! l all 0.15 fp16 xl3072 failed on GSAR9052.JPG: Fail('[ONNXRuntimeError] : 1 : FAIL : E:\\_work\\1\\s\\onnxruntime\\core\\providers\\dml\\DmlExecutionProvider\\src\\Exe
+    ! l all 0.15 fp16 xl3072 failed on GSAR9078.JPG: Fail('[ONNXRuntimeError] : 1 : FAIL : E:\\_work\\1\\s\\onnxruntime\\core\\providers\\dml\\DmlExecutionProvider\\src\\Exe
+    ! l all 0.15 fp16 xl3072 failed on GSAR9104.JPG: Fail('[ONNXRuntimeError] : 1 : FAIL : E:\\_work\\1\\s\\onnxruntime\\core\\providers\\dml\\DmlExecutionProvider\\src\\Exe
+    ! l all 0.15 fp16 xl3072 failed on GSAR9130.JPG: Fail('[ONNXRuntimeError] : 1 : FAIL : E:\\_work\\1\\s\\onnxruntime\\core\\providers\\dml\\DmlExecutionProvider\\src\\Exe
+    ! l all 0.15 fp16 xl3072 failed on GSAR9156.JPG: Fail('[ONNXRuntimeError] : 1 : FAIL : E:\\_work\\1\\s\\onnxruntime\\core\\providers\\dml\\DmlExecutionProvider\\src\\Exe
+    ! l all 0.15 fp16 xl3072 failed on GSAR9182.JPG: Fail('[ONNXRuntimeError] : 1 : FAIL : E:\\_work\\1\\s\\onnxruntime\\core\\providers\\dml\\DmlExecutionProvider\\src\\Exe
+    ! l all 0.15 fp16 xl3072 failed on GSAR9210.JPG: Fail('[ONNXRuntimeError] : 1 : FAIL : E:\\_work\\1\\s\\onnxruntime\\core\\providers\\dml\\DmlExecutionProvider\\src\\Exe
+  l all 0.15 fp16 xl3072 face 0.00  plate 0.00  sign 0.00   +extra f/p/s 0/0/0     0.1 s/img
+
+(recall = fraction of the generous reference's boxes this config kept;
+ 'extra' = boxes this config found beyond the reference -- new hits or false positives)
